@@ -14,9 +14,12 @@ import android.util.Log
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import java.io.FileInputStream
@@ -24,18 +27,19 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
-import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var imageView: ImageView
     private lateinit var resultTextView: TextView
-    private val TAG = "MainActivity"
+    private lateinit var addPinButton: Button
+    private lateinit var showMapButton: Button
 
-    // Ścieżka do modelu tflite
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    private val TAG = "MainActivity"
     private val modelPath = "flower_model.tflite"
 
-    // Lista nazw kwiatów
     private lateinit var flowerNames: List<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,20 +50,18 @@ class MainActivity : AppCompatActivity() {
         resultTextView = findViewById(R.id.resultTextView)
         val galleryButton: Button = findViewById(R.id.galleryButton)
         val cameraButton: Button = findViewById(R.id.cameraButton)
+        addPinButton = findViewById(R.id.addPinButton)
+        showMapButton = findViewById(R.id.showMapButton)
 
-        // Uprawnienia do aparatu
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
         ActivityCompat.requestPermissions(
             this,
-            arrayOf(Manifest.permission.CAMERA),
+            arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION),
             1
         )
 
-        // Wczytaj nazwy kwiatów z pliku tekstowego
         flowerNames = loadFlowerNames(this, "flower_names.txt")
-        // Wypisz nazwy kwiatów wraz z ich indeksami w logach
-        flowerNames.forEachIndexed { index, name ->
-            Log.d(TAG, "Index: $index, Flower Name: $name")
-        }
 
         // Wczytaj obraz z galerii
         val pickImage =
@@ -99,50 +101,39 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
             captureImage.launch(intent)
         }
+
+        addPinButton.setOnClickListener {
+            addPin()
+        }
+
+        showMapButton.setOnClickListener {
+            val intent = Intent(this, MapActivity::class.java)
+            startActivity(intent)
+        }
     }
 
     @SuppressLint("SetTextI18n")
     private fun classifyImage(bitmap: Bitmap) {
         try {
-            // Załaduj model TFLite z folderu assets
-            val interpreter = Interpreter(loadModelFile(applicationContext, "flower_model.tflite"))
-
-            // Dopasowanie obrazu do wymagań modelu (224x224 piksele)
+            val interpreter = Interpreter(loadModelFile(applicationContext, modelPath))
             val resizedBitmap = Bitmap.createScaledBitmap(bitmap, 224, 224, true)
-
-            // Normalizacja obrazu (przetwarzanie)
             val inputTensorBuffer = preprocessImage(resizedBitmap)
+            val output = Array(1) { FloatArray(102) }
 
-            // Przygotowanie zmiennej do przechowywania wyników (102 klasy)
-            val output = Array(1) { FloatArray(102) }  // Zakładając 102 klasy
-
-            // Wykonanie inferencji
             interpreter.run(inputTensorBuffer, output)
 
-            // Wypisz wszystkie wartości wyników
-            output[0].forEachIndexed { index, value ->
-                Log.d(TAG, "Class $index: Probability $value")
-            }
-
-            // Znalezienie indeksu klasy z najwyższym prawdopodobieństwem
             val predictedClass = output[0].withIndex().maxByOrNull { it.value }?.index ?: -1
-            Log.d(TAG, "Predicted class index: $predictedClass")
-
-            // Wyświetlenie wyniku
             if (predictedClass >= 0 && predictedClass < flowerNames.size) {
                 val flowerName = flowerNames[predictedClass]
-                resultTextView.text = "Indeks: ${predictedClass + 1}, Nazwa: $flowerName"
-                Log.d(TAG, "Predicted flower name: $flowerName")
+                resultTextView.text = flowerName // Zapisujemy tylko nazwę kwiatka
             } else {
                 resultTextView.text = "Nie rozpoznano kwiatka"
-                Log.d(TAG, "Nie rozpoznano kwiatka")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Błąd klasyfikacji: ${e.message}")
             resultTextView.text = "Błąd klasyfikacji: ${e.message}"
         }
     }
-
 
 
     private fun preprocessImage(bitmap: Bitmap): ByteBuffer {
@@ -188,4 +179,35 @@ class MainActivity : AppCompatActivity() {
         }
         return flowerNames
     }
+
+    private fun addPin() {
+        val sharedPreferences = getSharedPreferences("PINS", Context.MODE_PRIVATE)
+        val editor = sharedPreferences.edit()
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            location?.let {
+                val latitude = it.latitude
+                val longitude = it.longitude
+
+                // Uzyskanie nazwy kwiatka z `resultTextView`
+                val flowerName = resultTextView.text.toString()
+
+                // Generowanie unikalnego klucza dla każdej pinezki
+                val pinKey = "pin_${System.currentTimeMillis()}"
+
+                // Zapisanie lokalizacji i nazwy kwiatka w `SharedPreferences`
+                editor.putString(pinKey, "$latitude,$longitude,$flowerName")
+                editor.apply()
+
+                Toast.makeText(this, "Pinezka dodana!", Toast.LENGTH_SHORT).show()
+            } ?: run {
+                Toast.makeText(this, "Nie udało się uzyskać lokalizacji", Toast.LENGTH_SHORT).show()
+            }
+        }.addOnFailureListener {
+            Toast.makeText(this, "Błąd: ${it.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
+
 }

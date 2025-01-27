@@ -1,4 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -38,4 +40,22 @@
         android:layout_marginTop="10dp"
         android:layout_centerHorizontal="true"
         android:text="Zrób zdjęcie" />
+
+    <Button
+        android:id="@+id/addPinButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/cameraButton"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="10dp"
+        android:text="Dodaj pinezkę" />
+
+    <Button
+        android:id="@+id/showMapButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/addPinButton"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="10dp"
+        android:text="Wyświetl mapę" />
 </RelativeLayout>
