@@ -32,7 +32,7 @@
         <!-- Klucz API Google Maps -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="miejsce_na_api" />
+            android:value="AIzaSyCD_U4XR5nV6ZH360IKLyuzrKYP8O90fH8" />
 
         <activity android:name=".MainActivity"
             android:exported="true">

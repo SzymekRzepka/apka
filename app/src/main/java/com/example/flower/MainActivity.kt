@@ -118,22 +118,30 @@ class MainActivity : AppCompatActivity() {
             val interpreter = Interpreter(loadModelFile(applicationContext, modelPath))
             val resizedBitmap = Bitmap.createScaledBitmap(bitmap, 224, 224, true)
             val inputTensorBuffer = preprocessImage(resizedBitmap)
-            val output = Array(1) { FloatArray(102) }
+            val output = Array(1) { FloatArray(102) } // Zakładamy 102 klasy
 
             interpreter.run(inputTensorBuffer, output)
 
+            // Znalezienie klasy z najwyższym prawdopodobieństwem
             val predictedClass = output[0].withIndex().maxByOrNull { it.value }?.index ?: -1
-            if (predictedClass >= 0 && predictedClass < flowerNames.size) {
+            val probability = output[0].maxOrNull() ?: 0.0f
+
+            // Definicja progu prawdopodobieństwa (np. 40%)
+            val probabilityThreshold = 0.4f
+
+            // Wyświetlenie wyniku
+            if (probability >= probabilityThreshold && predictedClass >= 0 && predictedClass < flowerNames.size) {
                 val flowerName = flowerNames[predictedClass]
-                resultTextView.text = flowerName // Zapisujemy tylko nazwę kwiatka
+                resultTextView.text = "$flowerName (${(probability * 100).toInt()}%)"
             } else {
                 resultTextView.text = "Nie rozpoznano kwiatka"
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Błąd klasyfikacji: ${e.message}")
+            Log.e("MainActivity", "Błąd klasyfikacji: ${e.message}")
             resultTextView.text = "Błąd klasyfikacji: ${e.message}"
         }
     }
+
 
 
     private fun preprocessImage(bitmap: Bitmap): ByteBuffer {
@@ -180,6 +188,7 @@ class MainActivity : AppCompatActivity() {
         return flowerNames
     }
 
+    @SuppressLint("MissingPermission")
     private fun addPin() {
         val sharedPreferences = getSharedPreferences("PINS", Context.MODE_PRIVATE)
         val editor = sharedPreferences.edit()
